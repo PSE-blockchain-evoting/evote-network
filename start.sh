@@ -57,11 +57,21 @@ TAIL_PID=$!
 while true; do 
    if [ -f ${SDIR}/${RUN_SUCCESS_FILE} ]; then
       kill -9 $TAIL_PID
-      exit 0
+      break
    elif [ -f ${SDIR}/${RUN_FAIL_FILE} ]; then
       kill -9 $TAIL_PID
       exit 1
    else
       sleep 1
    fi
+done
+
+chaincodeContainers=$(docker ps | awk '$2~/dev-peer.*/{print $1}')
+while true; do
+	for container in $chaincodeContainers; do
+		if [[ `docker logs $container` = *"RESTART"* ]]; then
+			log "Restarting"
+			exec $(readlink -f "$0")
+		fi
+	done
 done

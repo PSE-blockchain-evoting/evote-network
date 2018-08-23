@@ -224,11 +224,11 @@ func (t *VoteChaincode) electionDataQuery(stub shim.ChaincodeStubInterface, args
 }
 
 func (t *VoteChaincode) destructionInvokation(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-	err := cid.AssertAttributeValue(stub, "voteAdmin", "true")
-	if err != nil {
-		return shim.Error("Failed to get state")
-	}
-
+	//err := cid.AssertAttributeValue(stub, "voteAdmin", "true")
+	//if err != nil {
+	//	return shim.Error("Failed to get state")
+	//}
+	fmt.Println("RESTART")
 	return shim.Success(nil)
 }
 
