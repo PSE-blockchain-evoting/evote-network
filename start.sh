@@ -70,8 +70,10 @@ chaincodeContainers=$(docker ps | awk '$2~/dev-peer.*/{print $1}')
 while true; do
 	for container in $chaincodeContainers; do
 		if [[ `docker logs $container` = *"RESTART"* ]]; then
+			sleep 10
 			log "Restarting"
 			exec $(readlink -f "$0")
 		fi
 	done
+	sleep 10
 done
