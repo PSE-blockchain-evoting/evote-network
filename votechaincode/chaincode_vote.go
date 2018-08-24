@@ -106,11 +106,10 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 	endTime := time.Unix(timeInt, 0)
 	now := time.Now()
 	if now.After(endTime) {
-		stub.SetEvent("status", []byte("ended"))
-		return shim.Success(nil)
+		return shim.Success([]byte("ended"))
 	}
-	stub.SetEvent("status", []byte("running"))
-	return shim.Success(nil)
+	//stub.SetEvent("status", []byte("running"))
+	//return shim.Success(nil)
 	//Check for VoterPercentileCondition
 	if string(*endConditionMap["type"]) != "\"VoterPercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
@@ -136,11 +135,9 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 
 		actualPercentage := numVotes / numAllVoters
 		if actualPercentage > neededPercentage {
-			stub.SetEvent("status", []byte("ended"))
-			return shim.Success(nil)
+			return shim.Success([]byte("ended"))
 		} else {
-			stub.SetEvent("status", []byte("running"))
-			return shim.Success(nil)
+			return shim.Success([]byte("running"))
 		}
 	} else if string(*endConditionMap["type"]) != "\"CandidatePercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
@@ -179,20 +176,14 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 		for _, num := range numVotes {
 			actualPercentage := num / numAllVoters
 			if actualPercentage > neededPercentage {
-				stub.SetEvent("status", []byte("ended"))
-				return shim.Success(nil)
+				return shim.Success([]byte("ended"))
 			} else {
-				stub.SetEvent("status", []byte("running"))
-				return shim.Success(nil)
+				return shim.Success([]byte("running"))
 			}
 		}
 	}
 
-	err = stub.SetEvent("status", []byte("running"))
-	if err != nil {
-		return shim.Error("SetEvent failed")
-	}
-	return shim.Success(nil)
+	return shim.Success([]byte("running"))
 }
 
 func (t *VoteChaincode) ownVoteQuery(stub shim.ChaincodeStubInterface, args []string) pb.Response {
@@ -224,10 +215,10 @@ func (t *VoteChaincode) electionDataQuery(stub shim.ChaincodeStubInterface, args
 }
 
 func (t *VoteChaincode) destructionInvokation(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-	//err := cid.AssertAttributeValue(stub, "voteAdmin", "true")
-	//if err != nil {
-	//	return shim.Error("Failed to get state")
-	//}
+	err := cid.AssertAttributeValue(stub,"admin","true")
+	if err != nil {
+		return shim.Error("User isn't admin")
+	}
 	fmt.Println("RESTART")
 	return shim.Success(nil)
 }
@@ -237,9 +228,9 @@ func (t *VoteChaincode) initializationInvokation(stub shim.ChaincodeStubInterfac
 	var initMap map[string]*json.RawMessage
 	var endConditionMap map[string]*json.RawMessage
 
-	err := cid.AssertAttributeValue(stub, "voteAdmin", "true")
+	err := cid.AssertAttributeValue(stub,"admin","true")
 	if err != nil {
-		//return shim.Error("CID assert failed")
+		return shim.Error("User isn't admin")
 	}
 
 	if len(args) != 1 {
@@ -290,7 +281,10 @@ func (t *VoteChaincode) initializationInvokation(stub shim.ChaincodeStubInterfac
 }
 
 func (t *VoteChaincode) voteInvokation(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-
+	err := cid.AssertAttributeValue(stub,"admin","true")
+	if err == nil {
+		return shim.Error("User is admin")
+	}
 	if len(args) != 1 {
 		return shim.Error("Incorrect number of arguments. Expecting a single JSON string representing a Vote")
 	}
