@@ -65,10 +65,14 @@ function main {
    # Instantiate chaincode on the 1st peer of the 2nd org
    makePolicy
    for ORG in $PEER_ORGS; do
-      initPeerVars $ORG 1
-      switchToAdminIdentity
-      logr "Instantiating chaincode on $PEER_HOST ..."
-      peer chaincode instantiate -C $CHANNEL_NAME -n mycc -v 1.0 -c '{"Args":["init","a","100","b","200"]}' $ORDERER_CONN_ARGS
+	 local COUNT=1
+      while [[ "$COUNT" -le $NUM_PEERS ]]; do
+         initPeerVars $ORG $COUNT
+         switchToAdminIdentity
+         logr "Instantiating chaincode on $PEER_HOST ..."
+         peer chaincode instantiate -C $CHANNEL_NAME -n mycc -v 1.0 -c '{"Args":["init","a","100","b","200"]}' $ORDERER_CONN_ARGS
+         COUNT=$((COUNT+1))
+      done
    done
 
    # Query chaincode from the 1st peer of the 1st org

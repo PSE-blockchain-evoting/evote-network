@@ -108,10 +108,8 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 	if now.After(endTime) {
 		return shim.Success([]byte("ended"))
 	}
-	//stub.SetEvent("status", []byte("running"))
-	//return shim.Success(nil)
 	//Check for VoterPercentileCondition
-	if string(*endConditionMap["type"]) != "\"VoterPercentileCondition\"" {
+	if string(*endConditionMap["type"]) == "\"VoterPercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
 		if err != nil {
 			return shim.Error("Failed to read percentage for VoterPercentileCondition")
@@ -133,13 +131,11 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 			return shim.Error("Failed to get voterCount")
 		}
 
-		actualPercentage := numVotes / numAllVoters
+		actualPercentage := int((float64(numVotes) / float64(numAllVoters))*100.0)
 		if actualPercentage > neededPercentage {
 			return shim.Success([]byte("ended"))
-		} else {
-			return shim.Success([]byte("running"))
 		}
-	} else if string(*endConditionMap["type"]) != "\"CandidatePercentileCondition\"" {
+	} else if string(*endConditionMap["type"]) == "\"CandidatePercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
 		if err != nil {
 			return shim.Error("Failed to read percentage for VoterPercentileCondition")
@@ -174,11 +170,9 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 		}
 
 		for _, num := range numVotes {
-			actualPercentage := num / numAllVoters
+			actualPercentage := int((float64(num) / float64(numAllVoters))*100.0)
 			if actualPercentage > neededPercentage {
 				return shim.Success([]byte("ended"))
-			} else {
-				return shim.Success([]byte("running"))
 			}
 		}
 	}
@@ -339,5 +333,3 @@ func main() {
 		fmt.Printf("Error starting Vote chaincode: %s", err)
 	}
 }
-
-
