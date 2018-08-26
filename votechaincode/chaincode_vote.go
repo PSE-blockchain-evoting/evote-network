@@ -300,7 +300,7 @@ func (t *VoteChaincode) voteInvokation(stub shim.ChaincodeStubInterface, args []
 	if err != nil {
 		return shim.Error(err.Error())
 	}
-	if !started || !ended {
+	if !started || ended {
 		return shim.Error("Election isn't running")
 	}
 
