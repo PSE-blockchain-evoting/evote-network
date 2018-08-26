@@ -111,7 +111,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 	startTime := time.Unix(startTimeInt, 0)
 	endTime := time.Unix(endTimeInt, 0)
 	now := time.Now()
-	startedBool := now.Before(startTime)
+	startedBool := now.After(startTime)
 
 	if now.After(endTime) {
 		return startedBool,true, nil
