@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/hyperledger/fabric/core/chaincode/lib/cid"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
@@ -74,49 +75,56 @@ func (t *VoteChaincode) allVotesQuery(stub shim.ChaincodeStubInterface, args []s
 	return shim.Success(returnJson)
 }
 
-func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended bool,err error) {
 	var initMap map[string]*json.RawMessage
 	var endConditionMap map[string]*json.RawMessage
 
 	//Retrieve Metadata from init Block
 	stateBytes, err := stub.GetState("init")
 	if err != nil {
-		return shim.Error("Failed to get state")
+		return false,false,errors.New("Failed to get state")
 	}
 	if stateBytes == nil {
-		return shim.Error("Init not set")
+		return false,false, errors.New("Init not set")
 	}
 
 	err = json.Unmarshal(stateBytes, &initMap)
 	if err != nil {
-		return shim.Error("Json couldn't be parsed")
+		return false, false, errors.New("Json couldn't be parsed")
 	}
 
 	err = json.Unmarshal([]byte(*initMap["endCondition"]), &endConditionMap)
 	if err != nil {
-		return shim.Error("Json couldn't be parsed")
+		return false,false, errors.New("Json couldn't be parsed")
 	}
 
 	//Check Time for all electionEndTypes
-	timeInt, err := strconv.ParseInt(string(*initMap["endDate"]), 10, 64)
+	endTimeInt, err := strconv.ParseInt(string(*initMap["endDate"]), 10, 64)
 	if err != nil {
-		return shim.Error("The given Time couldn't be parsed")
+		return false,false, errors.New("The given Time couldn't be parsed")
+	}
+	startTimeInt, err := strconv.ParseInt(string(*initMap["startDate"]), 10, 64)
+	if err != nil {
+		return false,false, errors.New("The given Time couldn't be parsed")
 	}
 
-	endTime := time.Unix(timeInt, 0)
+	startTime := time.Unix(startTimeInt, 0)
+	endTime := time.Unix(endTimeInt, 0)
 	now := time.Now()
+	startedBool := now.Before(startTime)
+
 	if now.After(endTime) {
-		return shim.Success([]byte("ended"))
+		return startedBool,true, nil
 	}
 	//Check for VoterPercentileCondition
 	if string(*endConditionMap["type"]) == "\"VoterPercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
 		if err != nil {
-			return shim.Error("Failed to read percentage for VoterPercentileCondition")
+			return false,false, errors.New("Failed to read percentage for VoterPercentileCondition")
 		}
 		stateIterator, err := stub.GetStateByRange("v", "w")
 		if err != nil {
-			return shim.Error("Failed to get StateIterator")
+			return false,false, errors.New("Failed to get StateIterator")
 		}
 		defer stateIterator.Close()
 
@@ -128,22 +136,22 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 
 		numAllVoters, err := strconv.Atoi(string(*initMap["voterCount"]))
 		if err != nil {
-			return shim.Error("Failed to get voterCount")
+			return false,false, errors.New("Failed to get voterCount")
 		}
 
 		actualPercentage := int((float64(numVotes) / float64(numAllVoters))*100.0)
 		if actualPercentage > neededPercentage {
-			return shim.Success([]byte("ended"))
+			return startedBool,true,nil
 		}
 	} else if string(*endConditionMap["type"]) == "\"CandidatePercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
 		if err != nil {
-			return shim.Error("Failed to read percentage for VoterPercentileCondition")
+			return false,false, errors.New("Failed to read percentage for VoterPercentileCondition")
 		}
 
 		stateIterator, err := stub.GetStateByRange("v", "w")
 		if err != nil {
-			return shim.Error("Failed to get StateIterator")
+			return false,false, errors.New("Failed to get StateIterator")
 		}
 		defer stateIterator.Close()
 
@@ -152,7 +160,7 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 		for stateIterator.HasNext() {
 			queryResponse, err := stateIterator.Next()
 			if err != nil {
-				return shim.Error("Failed to get next element from state")
+				return false,false, errors.New("Failed to get next element from state")
 			}
 			voteString := string(queryResponse.Value)
 			uniquePos := posOf(voteString,uniqueVotes)
@@ -166,18 +174,31 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 
 		numAllVoters, err := strconv.Atoi(string(*initMap["voterCount"]))
 		if err != nil {
-			return shim.Error("Failed to get voterCount")
+			return false,false, errors.New("Failed to get voterCount")
 		}
 
 		for _, num := range numVotes {
 			actualPercentage := int((float64(num) / float64(numAllVoters))*100.0)
 			if actualPercentage > neededPercentage {
-				return shim.Success([]byte("ended"))
+				return startedBool,true,nil
 			}
 		}
 	}
 
-	return shim.Success([]byte("running"))
+	return startedBool,false,nil
+}
+
+
+func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, args []string) pb.Response {
+	_, ended, err := electionStartedEndedCheck(stub)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	if ended {
+		return shim.Success([]byte("ended"))
+	} else {
+		return shim.Success([]byte("running"))
+	}
 }
 
 func (t *VoteChaincode) ownVoteQuery(stub shim.ChaincodeStubInterface, args []string) pb.Response {
@@ -275,7 +296,15 @@ func (t *VoteChaincode) initializationInvokation(stub shim.ChaincodeStubInterfac
 }
 
 func (t *VoteChaincode) voteInvokation(stub shim.ChaincodeStubInterface, args []string) pb.Response {
-	err := cid.AssertAttributeValue(stub,"admin","true")
+	started, ended, err := electionStartedEndedCheck(stub)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	if !started || !ended {
+		return shim.Error("Election isn't running")
+	}
+
+	err = cid.AssertAttributeValue(stub,"admin","true")
 	if err == nil {
 		return shim.Error("User is admin")
 	}
