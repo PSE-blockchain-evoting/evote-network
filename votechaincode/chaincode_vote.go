@@ -63,7 +63,7 @@ func (t *VoteChaincode) allVotesQuery(stub shim.ChaincodeStubInterface, args []s
 	for stateIterator.HasNext() {
 		queryResponse, err := stateIterator.Next()
 		if err != nil {
-			return shim.Error("Failed to get next element from state")
+			return shim.Error("StateIterator failed to retrieve next Element")
 		}
 		resultSlice = append(resultSlice, string(queryResponse.Value))
 	}
@@ -90,28 +90,36 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 
 	err = json.Unmarshal(stateBytes, &initMap)
 	if err != nil {
-		return false, false, errors.New("Json couldn't be parsed")
+		return false, false, errors.New("Json couldn't be parsed, maybe the initialization was done incorrectly.")
 	}
 
 	err = json.Unmarshal([]byte(*initMap["endCondition"]), &endConditionMap)
 	if err != nil {
-		return false,false, errors.New("Json couldn't be parsed")
+		return false,false, errors.New("Json of endCondition couldn't be parsed, maybe the initialization was done incorrectly.")
 	}
 
 	//Check Time for all electionEndTypes
 	endTimeInt, err := strconv.ParseInt(string(*initMap["endDate"]), 10, 64)
 	if err != nil {
-		return false,false, errors.New("The given Time couldn't be parsed")
+		return false,false, errors.New("endDate couldn't be parsed correctly, maybe the initialization was done incorrectly.")
 	}
 	startTimeInt, err := strconv.ParseInt(string(*initMap["startDate"]), 10, 64)
 	if err != nil {
-		return false,false, errors.New("The given Time couldn't be parsed")
+		return false,false, errors.New("startDate couldn't be parsed correctly, maybe the initialization was done incorrectly.")
 	}
 
 	startTime := time.Unix(startTimeInt, 0)
 	endTime := time.Unix(endTimeInt, 0)
 	now := time.Now()
 	startedBool := now.After(startTime)
+	
+	debugTimes := "start: "
+	debugTimes += strconv.FormatInt(startTime.Unix(),10)
+	debugTimes += "; now: "
+	debugTimes += strconv.FormatInt(now.Unix(),10)
+	debugTimes += "; end: "
+	debugTimes += strconv.FormatInt(endTime.Unix(),10)
+	fmt.Println(debugTimes)
 
 	if now.After(endTime) {
 		return startedBool,true, nil
@@ -120,7 +128,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 	if string(*endConditionMap["type"]) == "\"VoterPercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
 		if err != nil {
-			return false,false, errors.New("Failed to read percentage for VoterPercentileCondition")
+			return false,false, errors.New("Failed to parse percentage for VoterPercentileCondition")
 		}
 		stateIterator, err := stub.GetStateByRange("v", "w")
 		if err != nil {
@@ -136,7 +144,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 
 		numAllVoters, err := strconv.Atoi(string(*initMap["voterCount"]))
 		if err != nil {
-			return false,false, errors.New("Failed to get voterCount")
+			return false,false, errors.New("Failed to parse voterCount")
 		}
 
 		actualPercentage := int((float64(numVotes) / float64(numAllVoters))*100.0)
@@ -146,7 +154,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 	} else if string(*endConditionMap["type"]) == "\"CandidatePercentileCondition\"" {
 		neededPercentage, err := strconv.Atoi(string(*endConditionMap["percentage"]))
 		if err != nil {
-			return false,false, errors.New("Failed to read percentage for VoterPercentileCondition")
+			return false,false, errors.New("Failed to parse percentage for VoterPercentileCondition")
 		}
 
 		stateIterator, err := stub.GetStateByRange("v", "w")
@@ -160,7 +168,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 		for stateIterator.HasNext() {
 			queryResponse, err := stateIterator.Next()
 			if err != nil {
-				return false,false, errors.New("Failed to get next element from state")
+				return false,false, errors.New("StateIterator failed to retrieve next Element")
 			}
 			voteString := string(queryResponse.Value)
 			uniquePos := posOf(voteString,uniqueVotes)
@@ -174,7 +182,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 
 		numAllVoters, err := strconv.Atoi(string(*initMap["voterCount"]))
 		if err != nil {
-			return false,false, errors.New("Failed to get voterCount")
+			return false,false, errors.New("Failed to parse voterCount")
 		}
 
 		for _, num := range numVotes {
@@ -204,7 +212,7 @@ func (t *VoteChaincode) electionStatusQuery(stub shim.ChaincodeStubInterface, ar
 func (t *VoteChaincode) ownVoteQuery(stub shim.ChaincodeStubInterface, args []string) pb.Response {
 	creatorID, err := cid.GetID(stub)
 	if err != nil {
-		return shim.Error("Failed to get creator")
+		return shim.Error("Couldn't read ID from stub.")
 	}
 	key := "vote_" + creatorID
 	stateBytes, err := stub.GetState(key)
@@ -264,11 +272,11 @@ func (t *VoteChaincode) initializationInvokation(stub shim.ChaincodeStubInterfac
 
 	err = json.Unmarshal([]byte(initJson), &initMap)
 	if err != nil {
-		return shim.Error("Json couldn't be parsed")
+		return shim.Error("Json couldn't be parsed, maybe the initialization was done incorrectly.")
 	}
 	err = json.Unmarshal([]byte(*initMap["endCondition"]), &endConditionMap)
 	if err != nil {
-		return shim.Error("Json couldn't be parsed")
+		return shim.Error("endCondition couldn't be parsed, maybe the initialization was done incorrectly.")
 	}
 
 	_, err = strconv.ParseInt(string(*initMap["endDate"]), 10, 64)
@@ -277,11 +285,11 @@ func (t *VoteChaincode) initializationInvokation(stub shim.ChaincodeStubInterfac
 	}
 
 	if endConditionMap["type"] == nil {
-		return shim.Error("Json couldn't be parsed")
+		return shim.Error("Endcondition Type couldn't be parsed, maybe the initialization was done incorrectly.")
 	}
 	if string(*endConditionMap["type"]) != "\"TimeOnlyCondition\"" {
 		if endConditionMap["percentage"] == nil {
-			return shim.Error("Json couldn't be parsed")
+			return shim.Error("Percentage couldn't be parsed, maybe the initialization was done incorrectly.")
 		}
 	}
 
@@ -301,12 +309,17 @@ func (t *VoteChaincode) voteInvokation(stub shim.ChaincodeStubInterface, args []
 		return shim.Error(err.Error())
 	}
 	if !started || ended {
+		runningDebug := "Election started: "
+		runningDebug += strconv.FormatBool(started)
+		runningDebug += "; Election ended: "
+		runningDebug += strconv.FormatBool(ended)
+		fmt.Println(runningDebug)
 		return shim.Error("Election isn't running")
 	}
 
 	err = cid.AssertAttributeValue(stub,"admin","true")
 	if err == nil {
-		return shim.Error("User is admin")
+		return shim.Error("User is admin therefore is not allowed to vote")
 	}
 	if len(args) != 1 {
 		return shim.Error("Incorrect number of arguments. Expecting a single JSON string representing a Vote")
@@ -315,7 +328,7 @@ func (t *VoteChaincode) voteInvokation(stub shim.ChaincodeStubInterface, args []
 
 	creatorID, err := cid.GetID(stub)
 	if err != nil {
-		return shim.Error("Failed to get creator")
+		return shim.Error("Couldn't read ID from stub.")
 	}
 	key := "vote_" + creatorID
 	stateBytes, err := stub.GetState(key)
