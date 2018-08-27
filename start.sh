@@ -11,6 +11,8 @@
 
 set -e
 
+cd "$(dirname ${BASH_SOURCE[0]})"
+
 SDIR=$(dirname "$0")
 source ${SDIR}/scripts/env.sh
 
