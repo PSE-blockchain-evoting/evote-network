@@ -148,7 +148,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 		}
 
 		actualPercentage := int((float64(numVotes) / float64(numAllVoters))*100.0)
-		if actualPercentage > neededPercentage {
+		if actualPercentage >= neededPercentage {
 			return startedBool,true,nil
 		}
 	} else if string(*endConditionMap["type"]) == "\"CandidatePercentileCondition\"" {
@@ -187,7 +187,7 @@ func electionStartedEndedCheck(stub shim.ChaincodeStubInterface) (started,ended 
 
 		for _, num := range numVotes {
 			actualPercentage := int((float64(num) / float64(numAllVoters))*100.0)
-			if actualPercentage > neededPercentage {
+			if actualPercentage >= neededPercentage {
 				return startedBool,true,nil
 			}
 		}
