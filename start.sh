@@ -58,6 +58,7 @@ TAIL_PID=$!
 # Wait for the run container to complete
 while true; do 
    if [ -f ${SDIR}/${RUN_SUCCESS_FILE} ]; then
+      disown $TAIL_PID
       kill -9 $TAIL_PID
       break
    elif [ -f ${SDIR}/${RUN_FAIL_FILE} ]; then
@@ -67,6 +68,7 @@ while true; do
       sleep 1
    fi
 done
+log "#### ---- Success: Network started ---- ####"
 
 chaincodeContainers=$(docker ps | awk '$2~/dev-peer.*/{print $1}')
 while true; do
